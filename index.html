@@ -152,6 +152,8 @@
     .tap-button:active { transform: scale(.97); } .tap-button small { margin-left: 5px; font-size: 12px; font-weight: 500; opacity: .76; }
 
     .memory-mode-selector { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-bottom: 13px; }
+    .memory-layout-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 13px; }
+    .memory-layout-selector .memory-mode { min-height: 44px; }
     .memory-mode { min-height: 40px; padding: 7px 5px; border: 1px solid var(--line); border-radius: 12px; color: #657087; background: rgba(255,255,255,.62); font: 700 13px inherit; cursor: pointer; touch-action: manipulation; transition: transform .14s ease, color .14s ease, box-shadow .14s ease, background .14s ease; }
     .memory-mode:hover { transform: translateY(-1px); color: var(--blue); box-shadow: inset 0 0 0 1px rgba(10,132,255,.2); }
     .memory-mode.active { border-color: transparent; color: white; background: linear-gradient(135deg, #0a84ff, #5e5ce6); box-shadow: 0 6px 13px rgba(47,84,206,.2); }
@@ -324,6 +326,10 @@
           <div class="metric"><span>个人最佳</span><strong id="memoryBest">—</strong></div>
         </div>
         <div class="memory-stage">
+          <div class="memory-layout-selector" role="group" aria-label="选择数字键盘布局">
+            <button class="memory-mode" type="button" data-memory-layout="phone" aria-pressed="false">手机端 · 123 在上</button>
+            <button class="memory-mode" type="button" data-memory-layout="computer" aria-pressed="false">电脑端 · 789 在上</button>
+          </div>
           <div class="memory-mode-selector" role="group" aria-label="选择数字闪记难度">
             <button class="memory-mode active" type="button" data-memory-mode="6">6 位</button>
             <button class="memory-mode" type="button" data-memory-mode="8">8 位</button>
@@ -421,6 +427,7 @@
       const memory = { board: $('memoryBoard'), level: $('memoryLevel'), progressText: $('memoryProgressText'), progress: $('memoryProgress'), hint: $('memoryHint'), best: $('memoryBest'), record: $('memoryRecord'), feed: $('memoryFeed'), start: $('memoryStart'), modes: [...document.querySelectorAll('[data-memory-mode]')] };
       const memoryStages = [6, 8, 11, 15];
       let memoryMode = '6', memoryStageIndex = 0, memorySequence = [], memoryInput = [], memoryPhase = 'idle', memoryActive = false, memoryTimers = [], memoryLogs = [], memoryWrong = 0, memoryNextAction = 'start';
+      let memoryLayout = matchMedia('(pointer: coarse)').matches ? 'phone' : 'computer';
       const isChallenge = () => memoryMode === 'challenge';
       const currentMemoryLength = () => isChallenge() ? memoryStages[memoryStageIndex] : Number(memoryMode);
       const memoryModeLabel = () => isChallenge() ? '闯关模式' : `${currentMemoryLength()} 位练习`;
@@ -431,7 +438,14 @@
       function renderMemoryFeed() { memory.feed.innerHTML = memoryLogs.length ? memoryLogs.slice(0, 7).map(log => `<div class="feed-item ${log.type}"><span>${log.text}</span><strong>${log.score}</strong></div>`).join('') : '<div class="empty-history">每个数字会短暂亮起。<br>观察完成后，依序点击。</div>'; }
       function renderMemoryProgress(activeIndex = -1) { memory.progress.innerHTML = memorySequence.map((_, index) => `<i class="${index < memoryInput.length || (memoryPhase === 'preview' && index < activeIndex) ? 'done' : index === activeIndex || (memoryPhase === 'recall' && index === memoryInput.length) ? 'current' : ''}"></i>`).join(''); }
       function renderMemoryBoard(flashDigit = 0) {
-        memory.board.innerHTML = [...Array(9)].map((_, index) => { const digit = index + 1; const state = flashDigit === digit ? 'flash' : memoryWrong === digit ? 'wrong' : memoryInput.includes(digit) ? 'selected' : ''; return `<button type="button" class="memory-cell ${state}" data-memory-digit="${digit}" ${memoryPhase === 'recall' ? '' : 'disabled'}>${digit}</button>`; }).join('');
+        const digits = memoryLayout === 'phone' ? [1,2,3,4,5,6,7,8,9] : [7,8,9,4,5,6,1,2,3];
+        memory.board.innerHTML = digits.map(digit => { const state = flashDigit === digit ? 'flash' : memoryWrong === digit ? 'wrong' : memoryInput.includes(digit) ? 'selected' : ''; return `<button type="button" class="memory-cell ${state}" data-memory-digit="${digit}" ${memoryPhase === 'recall' ? '' : 'disabled'}>${digit}</button>`; }).join('');
+      }
+      function selectMemoryLayout(layout) {
+        if (memoryLayout !== layout && memoryActive) stopMemory();
+        memoryLayout = layout;
+        document.querySelectorAll('[data-memory-layout]').forEach(button => { const selected = button.dataset.memoryLayout === layout; button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected)); });
+        renderMemoryBoard();
       }
       function memoryStartLabel() { return isChallenge() ? '开始闯关挑战' : `开始 ${currentMemoryLength()} 位练习`; }
       function beginMemoryStage() {
@@ -472,12 +486,12 @@
       colour.board.addEventListener('click', (event) => { const button = event.target.closest('[data-colour-index]'); if (button) pickColour(+button.dataset.colourIndex); });
       memory.board.addEventListener('click', (event) => { const button = event.target.closest('[data-memory-digit]'); if (button) inputMemoryDigit(+button.dataset.memoryDigit); });
       memory.modes.forEach(button => button.addEventListener('click', () => selectMemoryMode(button.dataset.memoryMode)));
+      document.querySelectorAll('[data-memory-layout]').forEach(button => button.addEventListener('click', () => selectMemoryLayout(button.dataset.memoryLayout)));
       $('newGame').addEventListener('click', newNumberGame); colour.start.addEventListener('click', startColour); $('colourRestart').addEventListener('click', startColour); rhythm.start.addEventListener('click', startRhythm); $('rhythmRestart').addEventListener('click', startRhythm); $('tapButton').addEventListener('click', tapBeat); memory.start.addEventListener('click', startMemory); $('memoryRestart').addEventListener('click', startMemory);
       document.querySelectorAll('[data-game]').forEach(tab => tab.addEventListener('click', () => switchGame(tab.dataset.game)));
       document.addEventListener('keydown', (event) => { if (activeGame === 'number') { if (/^\d$/.test(event.key)) numberInput(event.key); else if (event.key === 'Backspace') { event.preventDefault(); guess = guess.slice(0, -1); renderNumber(); } else if (event.key === 'Enter') submitNumber(); } else if (activeGame === 'rhythm' && event.code === 'Space') { event.preventDefault(); tapBeat(); } else if (activeGame === 'memory') { if (/^[1-9]$/.test(event.key)) inputMemoryDigit(+event.key); else if (event.key === 'Enter' && !memoryActive) { event.preventDefault(); startMemory(); } } });
-      $('today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date()); newNumberGame(); colourBest(); rhythmBest(); renderColourBoard(); renderRhythm(); updateMemoryBest(); updateMemoryModeButtons(); updateMemoryMetrics(); renderMemoryBoard(); renderMemoryProgress();
+      $('today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date()); newNumberGame(); colourBest(); rhythmBest(); renderColourBoard(); renderRhythm(); updateMemoryBest(); updateMemoryModeButtons(); updateMemoryMetrics(); selectMemoryLayout(memoryLayout); renderMemoryProgress();
     })();
   </script>
 </body>
 </html>
-
